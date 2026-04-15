@@ -23,32 +23,32 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// POST endpoint for image upload
-router.post('/image', upload.single('image'), async (req, res) => {
+// POST endpoint for file upload (images, audio, etc.)
+router.post('/', upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).send({ message: 'No file uploaded' });
   }
   
   const deviceId = req.body.deviceId || 'unknown';
-  console.log('📸 Photo received from device:', deviceId);
+  const logType = req.body.logType || 'photo';
+  console.log(`📂 ${logType} received from device:`, deviceId);
 
   try {
-    // 1. Find device
     const device = await Device.findOne({ where: { deviceId } });
     
     if (device) {
-      // 2. Save record to database with filename reference
       const log = await TrackingLog.create({
         deviceId: device.id,
-        logType: 'photo',
+        logType: logType,
         fileName: req.file.filename,
         data: { originalName: req.file.originalname }
       });
 
-      // 3. Notify Dashboard live with the static URL
       const io = req.app.get('socketio');
       if (io) {
-        io.emit('photo_uploaded', {
+        // Broadcast to dashboard
+        const eventName = logType === 'audio' ? 'audio_uploaded' : 'photo_uploaded';
+        io.emit(eventName, {
           deviceId: deviceId,
           logId: log.id,
           url: `/uploads/${req.file.filename}`,
@@ -57,7 +57,7 @@ router.post('/image', upload.single('image'), async (req, res) => {
       }
 
       res.status(200).send({
-        message: 'Photo captured and logged successfully',
+        message: `${logType} logged successfully`,
         id: log.id
       });
     } else {

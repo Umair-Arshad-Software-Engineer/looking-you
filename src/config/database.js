@@ -17,8 +17,8 @@ const connectDB = async () => {
     await sequelize.authenticate();
     console.log('✅ MySQL Database Connected Successfully');
     
-    // Sync models (Optional: remove force: true in production)
-    await sequelize.sync({ alter: true });
+    // Sync models (Safe for development/production)
+    await sequelize.sync();
     console.log('✅ Database Models Synchronized');
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error);
