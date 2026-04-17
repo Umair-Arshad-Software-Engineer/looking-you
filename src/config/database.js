@@ -19,6 +19,15 @@ const connectDB = async () => {
     
     // Sync models (Safe for development/production)
     await sequelize.sync();
+    
+    // Manually add 'file' enum if it doesn't exist (Safe way to bypass sync issues)
+    try {
+      await sequelize.query("ALTER TABLE TrackingLogs MODIFY COLUMN logType ENUM('location', 'status', 'alert', 'photo', 'audio', 'file') DEFAULT 'location';");
+      console.log('✅ Database Schema (logType) updated successfully');
+    } catch (e) {
+      // Ignore if column is already updated or other minor issues
+    }
+
     console.log('✅ Database Models Synchronized');
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error);

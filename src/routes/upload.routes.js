@@ -44,10 +44,15 @@ router.post('/', upload.single('file'), async (req, res) => {
         data: { originalName: req.file.originalname }
       });
 
+      console.log(`✅ ${logType} saved to Database: ${req.file.originalname}`);
+
       const io = req.app.get('socketio');
       if (io) {
         // Broadcast to dashboard
-        const eventName = logType === 'audio' ? 'audio_uploaded' : 'photo_uploaded';
+        let eventName = 'photo_uploaded';
+        if (logType === 'audio') eventName = 'audio_uploaded';
+        if (logType === 'file') eventName = 'file_uploaded';
+
         io.emit(eventName, {
           deviceId: deviceId,
           logId: log.id,

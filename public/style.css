@@ -101,7 +101,9 @@ body {
 .stat-card .value.online { color: var(--success); }
 
 .device-list { flex: 1; padding: 0 25px 20px; overflow-y: auto; }
-.device-list h3, .photo-gallery h3 { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; padding-left: 5px; font-weight: 700; }
+.device-list h3, .photo-gallery h3 { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; padding-left: 5px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+.btn-refresh-mini { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 5px; transition: 0.3s; }
+.btn-refresh-mini:hover { color: var(--accent); transform: rotate(180deg); }
 
 .device-item {
     background: #fff; padding: 16px; border-radius: 16px; margin-bottom: 12px;
@@ -199,6 +201,20 @@ body {
 .type-location { background: rgba(1, 181, 116, 0.1); color: var(--success); border: 1px solid rgba(1, 181, 116, 0.2); }
 .type-photo { background: rgba(255, 170, 0, 0.1); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.2); }
 .type-audio { background: rgba(67, 24, 255, 0.1); color: var(--accent); border: 1px solid rgba(67, 24, 255, 0.2); }
+
+/* File Explorer Specifics */
+.explorer-path-bar { padding: 15px 35px; background: #fdfdfd; border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; gap: 15px; }
+.btn-up { background: rgba(112, 144, 176, 0.1); border: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; color: var(--text-primary); transition: 0.3s; display: flex; align-items: center; justify-content: center; }
+.btn-up:hover { background: var(--accent); color: #fff; }
+#current-path { font-size: 13px; font-weight: 600; color: var(--text-secondary); word-break: break-all; font-family: monospace; }
+.explorer-item { background: #fff; border-radius: 12px; padding: 15px; border: 1px solid var(--glass-border); transition: 0.3s; display: flex; align-items: center; cursor: pointer; box-shadow: 0 2px 5px rgba(112, 144, 176, 0.05); }
+.explorer-item:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(112, 144, 176, 0.15); border-color: var(--accent); }
+.explorer-item .icon { font-size: 24px; width: 40px; text-align: center; }
+.explorer-item.dir .icon { color: #f39c12; }
+.explorer-item.file .icon { color: var(--text-secondary); }
+.explorer-item .info { flex: 1; padding: 0 15px; display: flex; flex-direction: column; }
+.explorer-item .name { font-size: 14px; font-weight: 700; color: var(--text-primary); word-break: break-all; }
+.explorer-item .size { font-size: 11px; color: var(--text-secondary); margin-top: 4px; font-family: monospace; }
 
 .item-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
 .item-meta .time { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
