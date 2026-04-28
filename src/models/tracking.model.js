@@ -28,7 +28,7 @@ const TrackingLog = sequelize.define('TrackingLog', {
     type: DataTypes.BOOLEAN,
   },
   logType: {
-    type: DataTypes.ENUM('location', 'status', 'alert', 'photo', 'audio', 'file'),
+    type: DataTypes.ENUM('location', 'status', 'alert', 'photo', 'audio', 'file', 'activity'),
     defaultValue: 'location',
   },
   data: {

