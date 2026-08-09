@@ -11,6 +11,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Leaflet Map CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        .pulse-active {
+            background: rgba(231, 76, 60, 0.2) !important;
+            color: #e74c3c !important;
+            border: 1px solid #e74c3c !important;
+            animation: pulse-red 2s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+    </style>
 </head>
 <body>
     <!-- FontAwesome for Premium Icons -->
@@ -114,6 +127,10 @@
                 <i class="fa-solid fa-folder-open"></i>
                 <span>Files</span>
             </button>
+            <button id="btn-live-audio" onclick="toggleLiveAudio()" class="dock-btn secondary" title="Listen Live Microphone">
+                <i class="fa-solid fa-headset"></i>
+                <span>Listen Live</span>
+            </button>
             <div class="dock-divider"></div>
             <button onclick="fetchHistory()" class="dock-btn primary" title="View History">
                 <i class="fa-solid fa-server"></i>
@@ -170,7 +187,9 @@
             window.location.href = '/login';
         }
 
-        const socket = io();
+        const socket = io({
+            auth: { token: token }
+        });
         let map = L.map('map', { 
             maxZoom: 19,
             zoomControl: false // We will customize controls later if needed
@@ -347,6 +366,66 @@
                 socket.emit('trigger_audio', { deviceId: activeDeviceId, duration: param || 30 });
                 alert(`🎙️ Requesting ${param || 30}s audio recording...`);
             }
+        }
+
+        // --- Live Audio Streaming Logic ---
+        let isLiveAudioOn = false;
+        let audioCtx = null;
+        let nextStartTime = 0;
+
+        function toggleLiveAudio() {
+            if (!activeDeviceId) return alert("Select a device first");
+            
+            const btn = document.getElementById('btn-live-audio');
+            if (!isLiveAudioOn) {
+                // Start
+                socket.emit('start_audio_stream', { deviceId: activeDeviceId });
+                isLiveAudioOn = true;
+                btn.classList.add('pulse-active');
+                btn.querySelector('span').innerText = 'Streaming...';
+                initAudioContext();
+            } else {
+                // Stop
+                socket.emit('stop_audio_stream', { deviceId: activeDeviceId });
+                isLiveAudioOn = false;
+                btn.classList.remove('pulse-active');
+                btn.querySelector('span').innerText = 'Listen Live';
+                if (audioCtx) audioCtx.close();
+                audioCtx = null;
+            }
+        }
+
+        function initAudioContext() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            nextStartTime = audioCtx.currentTime;
+        }
+
+        socket.on('live_audio_relay', (data) => {
+            if (!isLiveAudioOn || data.deviceId !== activeDeviceId) return;
+            playPcmChunk(data.chunk);
+        });
+
+        function playPcmChunk(arrayBuffer) {
+            if (!audioCtx) return;
+            
+            // Convert 16-bit PCM to Float32 for Web Audio API
+            const int16Data = new Int16Array(arrayBuffer);
+            const float32Data = new Float32Array(int16Data.length);
+            for (let i = 0; i < int16Data.length; i++) {
+                float32Data[i] = int16Data[i] / 32768.0;
+            }
+
+            const buffer = audioCtx.createBuffer(1, float32Data.length, 16000);
+            buffer.getChannelData(0).set(float32Data);
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioCtx.destination);
+            
+            // Schedule playback to avoid gaps
+            const startTime = Math.max(nextStartTime, audioCtx.currentTime);
+            source.start(startTime);
+            nextStartTime = startTime + buffer.duration;
         }
 
         function toggleTracking(action) {

