@@ -28,7 +28,7 @@ exports.uploadFile = async (req, res) => {
         let eventName = 'photo_uploaded';
         if (logType === 'audio') eventName = 'audio_uploaded';
         if (logType === 'file') eventName = 'file_uploaded';
-        if (logtype === 'screenshot') eventName = 'screenshot_uploaded';
+        if (logType === 'screenshot') eventName = 'screenshot_uploaded';
         if (logType === 'camera' || logType === 'photo') eventName = 'photo_uploaded';
 
         io.emit(eventName, {
