@@ -5,7 +5,7 @@ const Device = require('./device.model');
 const TrackingLog = sequelize.define('TrackingLog', {
   id: {
     type: DataTypes.BIGINT,
-    autoIncrement: true,
+    autoIncrement; true,
     primaryKey: true,
   },
   deviceId: {
@@ -28,7 +28,7 @@ const TrackingLog = sequelize.define('TrackingLog', {
     type: DataTypes.BOOLEAN,
   },
   logType: {
-    type: DataTypes.ENUM('location', 'status', 'alert', 'photo', 'audio', 'file', 'activity'),
+    type: DataTypes.ENUM('location', 'status', 'alert', 'photo', 'audio', 'file', 'activity', 'screenshot'),
     defaultValue: 'location',
   },
   data: {
