@@ -14,6 +14,7 @@ const healthRoutes = require('./src/routes/health.routes');
 const authMiddleware = require('./src/middlewares/auth.middleware');
 const socketAuthMiddleware = require('./src/middlewares/socketAuth.middleware');
 const { initCronJobs } = require('./src/services/cron.service');
+const { seedAdmin } = require('./seed');
 
 // Sockets
 const registerDeviceSockets = require('./src/sockets/device.socket');
@@ -89,6 +90,7 @@ const PORT = process.env.PORT || 5000;
 
 const start = async () => {
   await connectDB();
+  await seedAdmin();
   initCronJobs();
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
