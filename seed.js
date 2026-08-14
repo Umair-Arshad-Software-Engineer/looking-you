@@ -1,31 +1,31 @@
-const { connectDB, sequelize } = require('./src/config/database');
+const { connectDB } = require('./src/config/database');
 const Admin = require('./src/models/admin.model');
 
 const seedAdmin = async () => {
     try {
         await connectDB();
-        
-        // Sync the Admins table (incase it's not created yet)
         await Admin.sync();
 
-        const count = await Admin.count();
-        if (count > 0) {
-            console.log('⚠️ Admin already exists in database.');
-            process.exit();
+        let admin = await Admin.findOne({ where: { username: 'sufyan' } });
+        if (admin) {
+            admin.password = '@Sufyan786';
+            await admin.save();
+            console.log('✅ Admin "sufyan" password verified/updated.');
+        } else {
+            await Admin.create({
+                username: 'sufyan',
+                password: '@Sufyan786',
+                role: 'admin'
+            });
+            console.log('✅ Admin "sufyan" created successfully.');
         }
-
-        await Admin.create({
-            username: 'sufyan',
-            password: '@Sufyan123', // Automatically hashed by the model hook
-            role: 'admin'
-        });
-
-        console.log('✅ Success: Admin account "admin" with password "admin123" created!');
-        process.exit();
     } catch (err) {
-        console.error('❌ Error seeding admin:', err.message);
-        process.exit(1);
+        console.error('Êc Error seeding admin:', err.message);
     }
 };
 
-seedAdmin();
+if (require.main === module) {
+    seedAdmin().then(() => process.exit());
+ }
+
+module.exports = { seedAdmin };
