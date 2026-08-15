@@ -325,26 +325,28 @@ audio { width: 100%; border-radius: 50px; outline: none; }
 
 
 
+
 /* ==========================================================================
-   MOBILE & TABLET RESPONSIVE SYSTEM (DEVICE GUARD PRO)
+   STATE-OF-THE-ART MOBILE & TABLET RESPONSIVE SYSTEM (DEVICE GUARD PRO)
    ========================================================================== */
 
-/* Mobile Bottom Navigation Bar (Hidden on Desktop) */
+/* Mobile Navigation Bar (Hidden on Desktop) */
 .mobile-nav-bar {
     display: none;
     position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 65px;
-    background: rgba(15, 23, 42, 0.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    height: 60px;
+    background: rgba(15, 23, 42, 0.96);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
     border-top: 1px solid var(--glass-border);
-    z-index: 1000;
+    z-index: 3000;
     justify-content: space-around;
     align-items: center;
     padding: 0 10px;
+    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.5);
 }
 
 .mobile-nav-btn {
@@ -358,15 +360,15 @@ audio { width: 100%; border-radius: 50px; outline: none; }
     color: var(--text-secondary);
     font-size: 10px;
     font-weight: 700;
-    gap: 4px;
+    gap: 3px;
     cursor: pointer;
-    transition: all 0.3s ease;
-    padding: 8px 0;
+    transition: all 0.25s ease;
+    padding: 6px 0;
 }
 
 .mobile-nav-btn i {
-    font-size: 20px;
-    transition: transform 0.3s;
+    font-size: 18px;
+    transition: transform 0.25s;
 }
 
 .mobile-nav-btn.active, .mobile-nav-btn:hover {
@@ -374,38 +376,30 @@ audio { width: 100%; border-radius: 50px; outline: none; }
 }
 
 .mobile-nav-btn.active i {
-    transform: translateY(-2px) scale(1.1);
+    transform: translateY(-2px) scale(1.15);
     color: var(--accent);
 }
 
 /* Tablet & Mobile Screens (Width <= 1024px) */
 @media (max-width: 1024px) {
-    body {
-        overflow: hidden;
-    }
-
-    .hud-container {
-        flex-direction: column;
-    }
-
-    /* Top Bar Responsive */
     .hud-top-bar {
-        top: 15px;
-        left: 15px;
-        right: 15px;
+        top: 12px;
+        left: 12px;
+        right: 12px;
         transform: none;
         width: auto;
         min-width: 0;
         height: auto;
-        padding: 12px 18px;
+        padding: 10px 16px;
         border-radius: 20px;
         flex-direction: row;
         justify-content: space-between;
-        gap: 12px;
+        gap: 10px;
+        z-index: 2500;
     }
 
     #active-device-name {
-        font-size: 15px;
+        font-size: 14px;
         max-width: 180px;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -420,55 +414,123 @@ audio { width: 100%; border-radius: 50px; outline: none; }
 
     /* Left Panel Responsive (Devices) */
     .hud-left-panel {
-        top: 80px;
-        left: 15px;
-        bottom: 80px;
+        top: 70px;
+        left: 12px;
+        bottom: 145px;
         width: 320px;
-        max-width: calc(100vw - 30px);
-        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        z-index: 500;
+        max-width: calc(100vw - 24px);
+        z-index: 2000;
     }
 
     /* Right Panel Responsive (Live Feed) */
     .hud-right-panel {
-        top: 80px;
-        right: 15px;
-        bottom: 80px;
+        top: 70px;
+        right: 12px;
+        bottom: 145px;
         width: 320px;
-        max-width: calc(100vw - 30px);
-        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        z-index: 500;
+        max-width: calc(100vw - 24px);
+        z-index: 2000;
     }
 
-    /* Bottom Dock Responsive */
+    /* Bottom Action Dock (ALWAYS VISIBLE & HIGHLY CLICKABLE) */
     .hud-bottom-dock {
-        bottom: 80px;
-        width: 92vw;
-        max-width: 500px;
-        padding: 8px 12px;
-        overflow-x: auto;
-        border-radius: 24px;
-        -webkit-overflow-scrolling: touch;
+        position: fixed !important;
+        bottom: 70px !important;
+        left: 12px !important;
+        right: 12px !important;
+        transform: none !important;
+        width: auto !important;
+        max-width: none !important;
+        height: auto !important;
+        padding: 10px 12px !important;
+        border-radius: 24px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 10px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        z-index: 2500 !important;
+        pointer-events: auto !important;
+        background: rgba(15, 23, 42, 0.92) !important;
+        backdrop-filter: blur(25px) !important;
+        -webkit-backdrop-filter: blur(25px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
     }
 
     .dock-btn {
-        width: 52px;
-        height: 52px;
-        border-radius: 16px;
-        flex-shrink: 0;
+        width: 62px !important;
+        height: 60px !important;
+        min-width: 62px !important;
+        border-radius: 18px !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        pointer-events: auto !important;
+        touch-action: manipulation !important;
+        cursor: pointer !important;
+        background: #ffffff !important;
+        color: #1b254b !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+        border: 1px solid rgba(112, 144, 176, 0.2) !important;
+        padding: 4px !important;
     }
 
-    .dock-btn i { font-size: 18px; }
+    .dock-btn i {
+        font-size: 18px !important;
+        color: #4318FF !important;
+        margin-top: 2px !important;
+        transform: none !important;
+    }
+
+    .dock-btn span {
+        font-size: 8px !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        opacity: 1 !important;
+        position: static !important;
+        transform: none !important;
+        color: #1b254b !important;
+        letter-spacing: 0.2px !important;
+        line-height: 1 !important;
+    }
+
+    .dock-btn.warning i { color: #EE5D50 !important; }
+    .dock-btn.secondary i { color: #0284c7 !important; }
+    .dock-btn.primary i { color: #4318FF !important; }
+
+    .dock-btn:active {
+        transform: scale(0.92) !important;
+        background: #4318FF !important;
+        color: #ffffff !important;
+    }
+
+    .dock-btn:active i, .dock-btn:active span {
+        color: #ffffff !important;
+    }
+
+    .dock-divider {
+        width: 2px !important;
+        height: 36px !important;
+        flex-shrink: 0 !important;
+        background: rgba(255, 255, 255, 0.2) !important;
+        margin: 0 4px !important;
+    }
 
     /* Overlay Panel Modal */
     .overlay .panel {
         width: 95vw;
-        max-height: 90vh;
+        max-height: 88vh;
         border-radius: 20px;
     }
 
-    .panel-header { padding: 18px 20px; }
-    .panel-body { padding: 20px; }
+    .panel-header { padding: 16px 20px; }
+    .panel-body { padding: 16px; }
 }
 
 /* Phone Screens (Width <= 768px) */
@@ -484,58 +546,49 @@ audio { width: 100%; border-radius: 50px; outline: none; }
         padding: 10px 14px;
     }
 
-    .active-status { gap: 10px; }
+    .active-status { gap: 8px; }
 
     #active-device-name {
-        font-size: 14px;
-        max-width: 130px;
+        font-size: 13px;
+        max-width: 120px;
     }
 
-    /* Mobile Drawer Views */
-    .hud-left-panel {
-        top: 65px;
+    /* Mobile Drawers (Left & Right Panels) */
+    .hud-left-panel, .hud-right-panel {
+        top: 60px;
         left: 10px;
         right: 10px;
-        bottom: 75px;
+        bottom: 140px;
         width: auto;
         max-width: none;
         display: none;
-    }
-
-    .hud-right-panel {
-        top: 65px;
-        left: 10px;
-        right: 10px;
-        bottom: 75px;
-        width: auto;
-        max-width: none;
-        display: none;
+        z-index: 2800;
     }
 
     .hud-left-panel.mobile-active,
     .hud-right-panel.mobile-active {
         display: flex !important;
-        animation: fadeIn 0.3s ease;
+        animation: slideUp 0.3s ease;
     }
 
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Action Dock on Phones: Sits right above bottom navigation bar */
     .hud-bottom-dock {
-        bottom: 75px;
-        left: 10px;
-        right: 10px;
-        transform: none;
-        width: auto;
-        max-width: none;
-        display: none;
+        bottom: 68px !important;
+        left: 8px !important;
+        right: 8px !important;
+        padding: 8px 10px !important;
+        gap: 8px !important;
+        border-radius: 20px !important;
     }
 
-    .hud-bottom-dock.mobile-active {
-        display: flex !important;
-        animation: fadeIn 0.3s ease;
-    }
-
-    .photo-gallery { padding: 18px; }
-    .logo { padding: 18px; }
-    .status-summary { padding: 15px; }
+    .photo-gallery { padding: 16px; }
+    .logo { padding: 16px; }
+    .status-summary { padding: 12px; }
 
     /* History & Modal Adjustments */
     .history-tabs {
@@ -544,8 +597,8 @@ audio { width: 100%; border-radius: 50px; outline: none; }
     }
 
     .tab-btn {
-        padding: 12px 14px;
-        font-size: 12px;
+        padding: 12px 10px;
+        font-size: 11px;
         white-space: nowrap;
     }
 }
