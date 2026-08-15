@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Looking You | Admin Dashboard</title>
+    <title>Device Guard Pro | Admin Dashboard</title>
     <link rel="stylesheet" href="style.css">
     <!-- Google Fonts: Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -52,7 +52,7 @@
         <!-- 3. Left Panel (Device Manager) -->
         <aside class="hud-left-panel glass-panel">
             <div class="logo">
-                <h1>Looking<span>You</span></h1>
+                <h1>Device Guard <span>Pro</span></h1>
                 <p>Command Node</p>
             </div>
             
@@ -102,6 +102,27 @@
         </aside>
 
         <!-- 5. Bottom Dock (Action Center) -->
+        
+        <!-- Mobile Navigation Bar -->
+        <nav class="mobile-nav-bar glass-panel">
+            <button class="mobile-nav-btn active" id="mnav-map" onclick="switchMobileTab('map')">
+                <i class="fa-solid fa-map-location-dot"></i>
+                <span>Map</span>
+            </button>
+            <button class="mobile-nav-btn" id="mnav-devices" onclick="switchMobileTab('devices')">
+                <i class="fa-solid fa-mobile-screen-button"></i>
+                <span>Nodes</span>
+            </button>
+            <button class="mobile-nav-btn" id="mnav-actions" onclick="switchMobileTab('actions')">
+                <i class="fa-solid fa-bolt"></i>
+                <span>Actions</span>
+            </button>
+            <button class="mobile-nav-btn" id="mnav-feed" onclick="switchMobileTab('feed')">
+                <i class="fa-solid fa-images"></i>
+                <span>Feed</span>
+            </button>
+        </nav>
+
         <div class="hud-bottom-dock glass-panel">
             <button onclick="triggerAction('request_location')" class="dock-btn" title="Request Location">
                 <i class="fa-solid fa-location-crosshairs"></i>
